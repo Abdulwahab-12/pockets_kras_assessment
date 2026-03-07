@@ -1,0 +1,22 @@
+; em.mdp - Energy Minimization for CHARMM36m
+integrator      = steep         ; Algorithm (steepest descent minimization)
+emtol           = 1000.0        ; Stop minimization when maximum force < 1000.0 kJ/mol/nm
+emstep          = 0.01          ; Minimization step size
+nsteps          = 50000         ; Maximum number of minimization steps
+
+; Neighbor searching and interactions
+nstlist         = 1             ; Frequency to update the neighbor list
+cutoff-scheme   = Verlet        ; Buffered neighbor searching
+ns_type         = grid          ; Method to determine neighbor list
+pbc             = xyz           ; Periodic Boundary Conditions in all 3 dimensions
+
+; Electrostatics
+coulombtype     = PME           ; Treatment of long range electrostatic interactions
+rcoulomb        = 1.2           ; Short-range electrostatic cut-off
+
+; CHARMM36-specific van der Waals settings
+vdwtype         = cutoff
+vdw-modifier    = force-switch
+rvdw-switch     = 1.0           ; Where to start switching the force
+rvdw            = 1.2           ; Short-range Van der Waals cut-off
+DispCorr        = no            ; Dispersion correction is strictly NO for CHARMM36

@@ -1,0 +1,53 @@
+; npt.mdp - 8 ns Pressure Equilibration
+define                  = -DPOSRES      ; KEEP POSITION RESTRAINTS ACTIVE
+integrator              = md
+nsteps                  = 4000000       ; 4 * 10^6 steps * 0.002 ps = 8000 ps (8 ns)
+dt                      = 0.002
+
+; Output control
+nstxout                 = 50000
+nstvout                 = 50000
+nstenergy               = 5000
+nstlog                  = 5000
+
+; Bond parameters
+continuation            = yes           ; Continuing from NVT
+constraint_algorithm    = lincs
+constraints             = h-bonds
+
+; Neighbor searching and vdW
+cutoff-scheme           = Verlet
+ns_type                 = grid
+nstlist                 = 20
+rlist                   = 1.2
+vdwtype                 = cutoff
+vdw-modifier            = force-switch
+rvdw-switch             = 1.0
+rvdw                    = 1.2
+DispCorr                = no
+
+; Electrostatics
+coulombtype             = PME
+rcoulomb                = 1.2
+pme_order               = 4
+fourierspacing          = 0.16
+
+; Temperature coupling
+tcoupl                  = V-rescale
+tc-grps                 = Protein Non-Protein
+tau_t                   = 0.1     0.1
+ref_t                   = 310     310
+
+; Pressure coupling
+pcoupl                  = c-rescale             ; Safer for equilibration with posres
+pcoupltype              = isotropic             ; Uniform scaling of box vectors
+tau_p                   = 2.0                   ; Time constant (ps)
+ref_p                   = 1.0                   ; Reference pressure (bar)
+compressibility         = 4.5e-5                ; Isothermal compressibility of water
+refcoord_scaling        = com                   ; REQUIRED FOR POSRES + PRESSURE COUPLING
+
+; Periodic boundary conditions
+pbc                     = xyz
+
+; Velocity generation
+gen_vel                 = no            ; Velocities are read from the NVT trajectory

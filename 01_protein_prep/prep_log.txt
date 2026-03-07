@@ -1,0 +1,1 @@
+Downloaded 4OBE.pdb. Isolated monomer Chain A using awk to prevent dimerization artifacts in Fpocket and reduce the MD water box size. Retained ATOM, GDP, and MG. Removed Chain B, HOH, and buffer molecules.

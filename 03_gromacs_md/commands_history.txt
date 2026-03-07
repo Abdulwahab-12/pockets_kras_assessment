@@ -1,0 +1,99 @@
+### KRAS (4OBE) MD Setup Command History ###
+
+# 1. Force Field Preparation
+# Downloaded and extracted the latest CHARMM36m force field (Feb 2026, CGenFF 5.0)
+wget https://mackerell.umaryland.edu/download.php?filename=CHARMM_ff_params_files/charmm36-feb2026_cgenff-5.0.ff.tgz -O charmm36-feb2026.ff.tgz
+tar -zxvf charmm36-feb2026.ff.tgz
+
+# 2. PDB Structure Repair and Formatting
+# Stripped chain 'A' identifier from HETATM (GDP/Mg2+) to separate them from the protein
+awk '/^HETATM/ { $0 = substr($0, 1, 21) " " substr($0, 23) } { print }' 4OBE_holo.pdb > 4OBE_fixed.pdb
+
+# Rebuilt missing side-chain heavy atoms (e.g., GLN 43) using PDBFixer
+python repair_structure.py  # Outputs 4OBE_repaired.pdb
+
+# Separated GDP and Mg2+ into distinct logical entities by inserting a TER flag
+sed '/^HETATM.*MG /i TER' 4OBE_repaired.pdb > 4OBE_final.pdb
+
+# 3. Topology Generation
+# Applied CHARMM36m natively, selecting standard protein termini (NH3+ and COO-)
+gmx pdb2gmx -f 4OBE_final.pdb -o kras_processed.gro -water tip3p -ignh -ter
+
+# 4. Solvation and Box Definition
+# Created a rhombic dodecahedron box with 1.0 nm distance to edges
+gmx editconf -f kras_processed.gro -o kras_box.gro -c -d 1.0 -bt dodecahedron
+
+# Solvated the box with TIP3P water
+gmx solvate -cp kras_box.gro -cs spc216.gro -o kras_solvated.gro -p topol.top
+
+# 5. Ion Addition (Neutralization + 0.15M NaCl)
+gmx grompp -f ions.mdp -c kras_solvated.gro -p topol.top -o ions.tpr -maxwarn 1
+gmx genion -s ions.tpr -o kras_ions.gro -p topol.top -pname NA -nname CL -neutral -conc 0.15
+# Selected 'SOL' group to replace water with ions
+
+# 6. Energy Minimization (EM)
+# Bypassed harmless CHARMM36m redundant dihedral warning (ffmissingdihedrals.itp)
+gmx grompp -f em.mdp -c kras_ions.gro -p topol.top -o em.tpr -maxwarn 1
+gmx mdrun -v -deffnm em -nb gpu
+
+# 7. Temperature Equilibration NVT - 2 ns
+gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr -maxwarn 1
+gmx mdrun -v -deffnm nvt -nb gpu
+
+# 8. Pressure Equilibration NPT - 8 ns
+gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr -maxwarn 1
+gmx mdrun -v -deffnm npt -nb gpu
+
+# 9. 100 ns Production MD
+# Removed position restraints to allow free conformational sampling.
+# Upgraded to Nose-Hoover thermostat and Parrinello-Rahman barostat for accurate ensemble thermodynamics.
+# Configured to save compressed trajectory frames every 10 ps.
+gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md_0_100.tpr -maxwarn 1
+gmx mdrun -v -deffnm md_0_100 -nb gpu
+
+# 10. Trajectory Post-Processing
+# Removed Periodic Boundary Condition (PBC) artifacts to center the protein
+gmx trjconv -s md_0_100.tpr -f md_0_100.xtc -o md_noPBC.xtc -pbc mol -center
+
+# 11. Core Structural Analysis (100 ns)
+# Calculated Root Mean Square Deviation (RMSD) for backbone stability
+gmx rms -s md_0_100.tpr -f md_noPBC.xtc -o rmsd.xvg -tu ns
+# Calculated Root Mean Square Fluctuation (RMSF) for per-residue flexibility
+gmx rmsf -s md_0_100.tpr -f md_noPBC.xtc -o rmsf.xvg -res
+# Calculated Radius of Gyration (Rg) for structural compactness
+gmx gyrate -s md_0_100.tpr -f md_noPBC.xtc -o gyrate.xvg
+
+# 12. Advanced Analysis & Visualization Prep
+# Calculated Solvent Accessible Surface Area (SASA)
+gmx sasa -s md_0_100.tpr -f md_noPBC.xtc -o sasa.xvg
+# Extracted the final 100 ns frame as a PDB for high-resolution pocket visualization
+gmx trjconv -s md_0_100.tpr -f md_noPBC.xtc -dump 100000 -o final_100ns_frame.pdb
+
+
+# 13. Validated Allosteric Target Stability Analysis (mdpocket)
+mkdir pocket_analysis
+cd pocket_analysis
+
+# Create a custom index to retain the Protein, GDP ligand, and Mg2+ ion, while stripping bulk solvent/ions.
+# RATIONALE: The GDP acts as a structural anchor. Stripping it artificially collapses the Switch I/II regions.
+# In make_ndx, merged groups: 1 (Protein) | 13 (GDP) | 14 (MG) -> outputs as Group 22
+gmx make_ndx -f ../../03_gromacs_md/md_0_100.tpr -o pocket_index.ndx
+
+# Extract 100 aligned snapshots from the MD trajectory to prevent protein tumbling relative to the grid
+# Selected Group 4 (Backbone) for least squares fit, and Group 22 (Protein_GDP_MG) for output
+gmx trjconv -s ../../03_gromacs_md/md_0_100.tpr -f ../../03_gromacs_md/md_noPBC.xtc -n pocket_index.ndx -o frame_.pdb -sep -skip 100 -fit rot+trans
+
+# Generate a chronologically ordered trajectory list
+ls -v frame_*.pdb > trajectory_list.txt
+
+# Evaluate pocket druggability on the fully equilibrated, ligand-bound structure (MD Frame 0)
+fpocket -f frame_0.pdb
+# RATIONALE: Maintaining the GDP in the active site forced the algorithm to properly evaluate distal cavities.
+# Pocket 4 (Switch I/II allosteric site) was retained as the viable target (Initial Druggability Score: 0.387).
+
+# Format the target pocket's alpha sphere file to standard PDB length to bypass legacy software memory limits
+cut -c 1-66 frame_0_out/pockets/pocket4_vert.pqr > p4_safe.pdb
+
+# Perform targeted volumetric, accessibility, and shape characterization of Pocket 4 across the 100 ns trajectory
+mdpocket -L trajectory_list.txt --selected_pocket p4_safe.pdb
+# Output: mdpout_descriptors.txt

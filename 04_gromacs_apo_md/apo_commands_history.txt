@@ -1,0 +1,85 @@
+### KRAS APO (4OBE) MD Setup Command History ###
+
+# 1. Workspace Preparation
+# Created a symlink to the CHARMM36m force field directory to ensure consistency with HOLO
+ln -s ../03_gromacs_md/charmm36-feb2026_cgenff-5.0.ff .
+
+# 2. Isolate APO Protein
+# Stripped HETATM (GDP/Mg2+) and CONECT records from the repaired HOLO structure
+grep -v "HETATM" ../03_gromacs_md/4OBE_repaired.pdb | grep -v "CONECT" > 4OBE_apo.pdb
+
+# 3. Topology Generation
+# Applied CHARMM36m natively, selecting standard protein termini (1: NH3+ and 0: COO-)
+gmx pdb2gmx -f 4OBE_apo.pdb -o kras_apo_processed.gro -water tip3p -ignh -ter
+
+# 4. Solvation and Box Definition
+# Created a rhombic dodecahedron box with 1.0 nm distance to edges
+gmx editconf -f kras_apo_processed.gro -o kras_apo_box.gro -c -d 1.0 -bt dodecahedron
+
+# Solvated the box with TIP3P water
+gmx solvate -cp kras_apo_box.gro -cs spc216.gro -o kras_apo_solvated.gro -p topol.top
+
+# 5. Ion Addition (Neutralization + 0.15M NaCl)
+# Bypassed harmless CHARMM36m redundant dihedral warning
+gmx grompp -f ions.mdp -c kras_apo_solvated.gro -p topol.top -o ions.tpr -maxwarn 1
+gmx genion -s ions.tpr -o kras_apo_ions.gro -p topol.top -pname NA -nname CL -neutral -conc 0.15
+# Selected 'SOL' group to replace water with ions
+
+# 6. Energy Minimization (EM)
+gmx grompp -f em.mdp -c kras_apo_ions.gro -p topol.top -o em_apo.tpr -maxwarn 1
+gmx mdrun -v -deffnm em_apo -nb gpu
+
+# 7. Equilibration and Production Pipeline (Chained)
+gmx grompp -f nvt.mdp -c em_apo.gro -r em_apo.gro -p topol.top -o nvt_apo.tpr -maxwarn 1
+gmx mdrun -deffnm nvt_apo -nb gpu
+gmx grompp -f npt.mdp -c nvt_apo.gro -r nvt_apo.gro -t nvt_apo.cpt -p topol.top -o npt_apo.tpr -maxwarn 1
+gmx mdrun -deffnm npt_apo -nb gpu
+gmx grompp -f md.mdp -c npt_apo.gro -t npt_apo.cpt -p topol.top -o md_0_100_apo.tpr -maxwarn 1
+gmx mdrun -v -deffnm md_0_100_apo -nb gpu
+
+# 8. APO Trajectory Post-Processing
+# Removed Periodic Boundary Condition (PBC) artifacts to center the protein for stable analysis
+gmx trjconv -s md_0_100_apo.tpr -f md_0_100_apo.xtc -o md_noPBC_apo.xtc -pbc mol -center
+# Selected 'Protein' (1) for centering and 'System' (0) for output
+
+# 9. Core Structural Analysis (APO 100 ns)
+# Calculated Root Mean Square Deviation (RMSD) for backbone stability comparison
+gmx rms -s md_0_100_apo.tpr -f md_noPBC_apo.xtc -o rmsd_apo.xvg -tu ns
+# Selected 'Backbone' (4) for least squares fit and 'Backbone' (4) for calculation
+
+# Calculated Root Mean Square Fluctuation (RMSF) to track Switch I/II destabilization
+gmx rmsf -s md_0_100_apo.tpr -f md_noPBC_apo.xtc -o rmsf_apo.xvg -res
+# Selected 'Protein' (1)
+
+# Calculated Radius of Gyration (Rg) for global compactness comparison
+gmx gyrate -s md_0_100_apo.tpr -f md_noPBC_apo.xtc -o gyrate_apo.xvg
+# Selected 'Protein' (1)
+
+# Calculated Solvent Accessible Surface Area (SASA)
+gmx sasa -s md_0_100_apo.tpr -f md_noPBC_apo.xtc -o sasa_apo.xvg
+# Selected 'Protein' (1)
+
+# 10. APO Allosteric Target Stability Analysis (mdpocket comparison)
+mkdir pocket_analysis_apo
+cd pocket_analysis_apo
+
+# Extract 100 aligned snapshots from the APO trajectory
+gmx trjconv -s ../md_0_100_apo.tpr -f ../md_noPBC_apo.xtc -o frame_apo_.pdb -sep -skip 100 -fit rot+trans
+# Selected 'Backbone' (4) for least squares fit, and 'Protein' (1) for output to strip bulk solvent
+
+# Generate a chronologically ordered trajectory list
+ls -v frame_apo_*.pdb > trajectory_list_apo.txt
+
+# Perform targeted volumetric characterization using the HOLO pocket blueprint (p4_safe.pdb)
+# RATIONALE: By applying the holo pocket coordinates to the apo trajectory, we directly measure 
+# the structural collapse of the allosteric site in the absence of the GDP anchor.
+mdpocket -L trajectory_list_apo.txt --selected_pocket ../pocket_analysis/p4_safe.pdb
+# Output: mdpout_descriptors.txt (APO data)
+
+# 11. Static Pocket Re-Evaluation (Apo Baseline)
+# Ran fpocket on the fully equilibrated, ligand-free structure to assess static pocket collapse
+fpocket -f frame_apo_0.pdb
+# RATIONALE: To confirm that removing the GDP anchor causes immediate topological collapse 
+# of the allosteric site during equilibration.
+# RESULT: The empty orthosteric site (Pocket 2) remained highly druggable (Score: 0.698), 
+# while the Switch I/II allosteric site completely collapsed (Max secondary score: 0.006).

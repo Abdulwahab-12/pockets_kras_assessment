@@ -1,0 +1,51 @@
+# Ignore large GROMACS trajectory and binary files
+*.trr
+*.xtc
+*.edr
+*.tpr
+*.cpt
+
+# Ignore large PDBs if they exceed GitHub limits (optional, but good practice)
+*.pdb
+
+# Ignore python cache if you write scripts
+__pycache__/
+*.pyc*_out/*.pdb
+*_out/pockets/
+charmm36-feb2026_cgenff-5.0.ff/
+*.tgz
+*.gro
+*.top
+*.itp
+*fixed*.pdb
+*pruned*.pdb
+*repaired*.pdb
+#*#
+.ipynb_checkpoints/
+anaconda_projects/
+.anaconda_projects/
+.ipynb_checkpoints/
+anaconda_projects/
+.anaconda_projects/
+
+# --- LaTeX Build Files ---
+*.aux
+*.bbl
+*.blg
+*.fls
+*.out
+*.toc
+*.fdb_latexmk
+*.synctex.gz
+
+# --- Heavy Uncompressed Images ---
+*.tif
+*.tiff
+
+# --- Additional GROMACS/MD Files ---
+\#*\#
+step*.pdb
+
+# --- OS Junk ---
+.DS_Store
+Thumbs.db

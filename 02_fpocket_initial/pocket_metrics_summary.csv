@@ -1,0 +1,19 @@
+State,Pocket_ID,Druggability_Score,Volume,Hydrophobicity_Score,Polarity_Score
+Apo,Pocket 4,0.195,438.211,14.25,5.0
+Apo,Pocket 2,0.026,456.682,-11.333,9.0
+Apo,Pocket 3,0.002,397.145,11.2,6.0
+Apo,Pocket 5,0.002,398.989,22.083,8.0
+Apo,Pocket 6,0.002,472.012,-1.273,7.0
+Apo,Pocket 1,0.0,368.091,17.462,9.0
+Apo,Pocket 7,0.0,288.045,-5.714,6.0
+Apo,Pocket 8,0.0,426.764,-15.0,7.0
+Apo,Pocket 9,0.0,310.09,10.0,7.0
+Apo,Pocket 10,0.0,210.258,16.857,5.0
+Holo,Pocket 2,0.646,445.945,-11.333,9.0
+Holo,Pocket 3,0.039,390.648,22.083,8.0
+Holo,Pocket 4,0.026,468.628,-1.273,7.0
+Holo,Pocket 6,0.006,424.774,-15.0,7.0
+Holo,Pocket 5,0.004,281.874,-5.714,6.0
+Holo,Pocket 1,0.002,369.646,17.462,9.0
+Holo,Pocket 7,0.0,308.592,10.0,7.0
+Holo,Pocket 8,0.0,213.832,16.857,5.0
