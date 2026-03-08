@@ -1,4 +1,4 @@
-# KRAS Binding Pocket Dynamics: Rayca Assessment
+# KRAS Binding Pocket Dynamics: Assessment
 
 ## Overview
 This repository contains the computational pipeline for detecting and characterizing binding pockets in the KRAS protein using Fpocket, followed by a 100 ns Molecular Dynamics (MD) simulation using GROMACS to analyze pocket stability and druggability.
@@ -16,3 +16,4 @@ This repository contains the computational pipeline for detecting and characteri
 * GROMACS 
 
 * Python 3.x (pandas, scikit-learn, MDAnalysis, matplotlib, seaborn)
+
